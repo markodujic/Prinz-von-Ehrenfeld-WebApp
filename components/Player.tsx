@@ -25,6 +25,7 @@ type Props = {
   onCollectItem?: (id: string) => void;
   onTakeDamage?: () => void;
   onPositionChange?: (pos: { x: number; y: number }) => void;
+  onJump?: () => void;
 };
 
 const SIZE = 64;      // Sprite-Größe (unveränderlich für Rendering)
@@ -74,6 +75,7 @@ export default function Player({
   onCollectItem,
   onTakeDamage,
   onPositionChange,
+  onJump,
 }: Props) {
   // pos = Sprite-Top-Left; Hitbox = pos + HIT_OFFSET_*
   const initY = groundY - HIT_OFFSET_Y - HIT_H;
@@ -88,6 +90,7 @@ export default function Player({
   const onCollectItemRef = useRef(onCollectItem);
   const onTakeDamageRef  = useRef(onTakeDamage);
   const onPositionChangeRef = useRef(onPositionChange);
+  const onJumpRef = useRef(onJump);
   const frameTimeRef = useRef(0); // akkumulierte Zeit für Frame-Wechsel
   const frameIdxRef  = useRef(0); // aktueller Run-Frame-Index
   const idleTimeRef  = useRef(0); // akkumulierte Zeit für Idle-Frame-Wechsel
@@ -102,6 +105,7 @@ export default function Player({
   useEffect(() => { onCollectItemRef.current = onCollectItem; }, [onCollectItem]);
   useEffect(() => { onTakeDamageRef.current = onTakeDamage; }, [onTakeDamage]);
   useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
+  useEffect(() => { onJumpRef.current = onJump; }, [onJump]);
 
   useEffect(() => {
     function down(e: KeyboardEvent) {
@@ -138,6 +142,7 @@ export default function Player({
       if (jump && onGroundRef.current) {
         vel.current.y = JUMP_VELOCITY;
         onGroundRef.current = false;
+        onJumpRef.current?.();
       }
 
       // physics

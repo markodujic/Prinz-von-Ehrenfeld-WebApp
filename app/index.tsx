@@ -5,6 +5,7 @@ import Collectible from '../components/Collectible';
 import Enemy from '../components/Enemy';
 import GameBackground from '../components/GameBackground';
 import LevelComplete from '../components/LevelComplete';
+import { useSound } from '../hooks/useSound';
 import {
   LEVEL1_PLATFORMS,
   LEVEL1_COLLECTIBLES,
@@ -40,6 +41,8 @@ export default function Page() {
   const playerPosRef = useRef({ x: LEVEL1_START_X, y: 0 });
   const [playerPos,  setPlayerPos]          = useState({ x: LEVEL1_START_X, y: 0 });
 
+  const { play } = useSound();
+
   // Damit onCollectItem keine unnötigen Re-Renders via dep-Array auslöst
   const collectedIdsRef = useRef(collectedIds);
   collectedIdsRef.current = collectedIds;
@@ -52,18 +55,21 @@ export default function Page() {
       // Level-Ende prüfen
       if (next.size === LEVEL1_COLLECTIBLES.length) {
         setLevelComplete(true);
+        play('level_complete');
       }
       return next;
     });
     const def = LEVEL1_COLLECTIBLES.find(c => c.id === id);
     if (def) {
       setScore(s => s + (def.type === 'koelsch' ? LEVEL1_SCORE_KOELSCH : LEVEL1_SCORE_STICKER));
+      play(def.type === 'sticker' ? 'collect_sticker' : 'collect_koelsch');
     }
-  }, []);
+  }, [play]);
 
   const handleTakeDamage = useCallback((_enemyId: string) => {
     setLives(l => Math.max(0, l - 1));
-  }, []);
+    play('damage');
+  }, [play]);
 
   const handleEnemyDefeated = useCallback((id: string) => {
     setDefeatedIds(prev => {
@@ -72,7 +78,8 @@ export default function Page() {
       return next;
     });
     setScore(s => s + 25);
-  }, []);
+    play('stomp');
+  }, [play]);
 
   const handlePositionChange = useCallback((pos: { x: number; y: number }) => {
     playerPosRef.current = pos;
@@ -153,6 +160,7 @@ export default function Page() {
           onCollectItem={handleCollect}
           onTakeDamage={() => handleTakeDamage('player')}
           onPositionChange={handlePositionChange}
+          onJump={() => play('jump')}
         />
 
         {/* Level-Complete-Overlay */}
