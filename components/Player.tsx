@@ -9,11 +9,22 @@ type GamePlatform = {
   solid?: boolean;
 };
 
+type CollectibleHit = {
+  id: string;
+  x: number;
+  y: number;
+  size: number;  // Breite & Höhe des Collectibles
+};
+
 type Props = {
   startX?: number;
   groundY?: number;
   containerWidth?: number;
   platforms?: GamePlatform[];
+  collectibles?: CollectibleHit[];
+  onCollectItem?: (id: string) => void;
+  onTakeDamage?: () => void;
+  onPositionChange?: (pos: { x: number; y: number }) => void;
 };
 
 const SIZE = 64;      // Sprite-Größe (unveränderlich für Rendering)
@@ -56,7 +67,14 @@ const IDLE_FRAMES = [
 // Für Sprung nehmen wir vorerst Frame 3 (Beine auseinander)
 const JUMP_FRAME = require('../assets/sprites/Kev_run_3.png');
 
-export default function Player({startX = 100, groundY = 500, containerWidth = 800, platforms = []}: Props) {
+export default function Player({
+  startX = 100, groundY = 500, containerWidth = 800,
+  platforms = [],
+  collectibles = [],
+  onCollectItem,
+  onTakeDamage,
+  onPositionChange,
+}: Props) {
   // pos = Sprite-Top-Left; Hitbox = pos + HIT_OFFSET_*
   const initY = groundY - HIT_OFFSET_Y - HIT_H;
   const [pos, setPos] = useState({x: startX, y: initY});
@@ -66,6 +84,10 @@ export default function Player({startX = 100, groundY = 500, containerWidth = 80
   const vel = useRef({x: 0, y: 0});
   const onGroundRef = useRef(true);
   const platformsRef = useRef(platforms);
+  const collectiblesRef = useRef(collectibles);
+  const onCollectItemRef = useRef(onCollectItem);
+  const onTakeDamageRef  = useRef(onTakeDamage);
+  const onPositionChangeRef = useRef(onPositionChange);
   const frameTimeRef = useRef(0); // akkumulierte Zeit für Frame-Wechsel
   const frameIdxRef  = useRef(0); // aktueller Run-Frame-Index
   const idleTimeRef  = useRef(0); // akkumulierte Zeit für Idle-Frame-Wechsel
@@ -74,10 +96,12 @@ export default function Player({startX = 100, groundY = 500, containerWidth = 80
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number | null>(null);
 
-  // keep platformsRef in sync without restarting the RAF loop
-  useEffect(() => {
-    platformsRef.current = platforms;
-  }, [platforms]);
+  // keep refs in sync without restarting the RAF loop
+  useEffect(() => { platformsRef.current = platforms; }, [platforms]);
+  useEffect(() => { collectiblesRef.current = collectibles; }, [collectibles]);
+  useEffect(() => { onCollectItemRef.current = onCollectItem; }, [onCollectItem]);
+  useEffect(() => { onTakeDamageRef.current = onTakeDamage; }, [onTakeDamage]);
+  useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
 
   useEffect(() => {
     function down(e: KeyboardEvent) {
@@ -191,11 +215,24 @@ export default function Player({startX = 100, groundY = 500, containerWidth = 80
         newFrame = 100 + idleIdxRef.current; // 100–105 = Idle-Frames
       }
 
+      // Collectible-Kollision prüfen
+      const hbX2 = nextX + HIT_OFFSET_X;
+      const hbY2 = nextY + HIT_OFFSET_Y;
+      for (const c of collectiblesRef.current) {
+        // Einfache AABB-Kolision: Spieler-Hitbox gegen Collectible-Box
+        const overlapCX = hbX2 + HIT_W > c.x && hbX2 < c.x + c.size;
+        const overlapCY = hbY2 + HIT_H > c.y - c.size && hbY2 < c.y;
+        if (overlapCX && overlapCY) {
+          onCollectItemRef.current?.(c.id);
+        }
+      }
+
       // update refs and state
       const newPos = {x: nextX, y: nextY};
       posRef.current = newPos;
       setPos(newPos);
       setSpriteFrame(newFrame);
+      onPositionChangeRef.current?.(newPos);
       if (left) setFacingLeft(true);
       if (right) setFacingLeft(false);
       rafRef.current = requestAnimationFrame(step);
