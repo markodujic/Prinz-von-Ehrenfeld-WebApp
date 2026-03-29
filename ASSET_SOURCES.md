@@ -35,7 +35,9 @@ Dateipfad: `Assets/Art/Sprites/Placeholder/`
 
 | Datei | Charakter | SpriteCook Asset-ID | Beschreibung |
 |-------|-----------|---------------------|--------------|
-| `Player.png` | Kev (Protagonist) | `5adebfa3-ea58-471e-8475-57f4bfe3fe29` | Hoodie, Cap, Sneaker – Ehrenfelder Typ |
+| `Kev.png` | Kev (Protagonist) | `5adebfa3-ea58-471e-8475-57f4bfe3fe29` | Hoodie, Rucksack, Sneaker – Basis-Idle-Referenz |
+| `Kev_idle_1–6.png` | Kev – Idle-Animation | — | Generiert via `scripts/generate-idle-animation.py` |
+| `Kev_run_1–8.png` | Kev – Lauf-Animation | — | Generiert via `scripts/generate-run-animation.py` |
 | `Hooliganito.png` | Hooliganito | *(letzter Job)* | Kleiner Schläger, Trainingsanzug |
 | `KioskRaeuber.png` | KioskRäuber | *(letzter Job)* | Kioskbetreiber-Gegner |
 | `TalentscoutKurt.png` | TalentscoutKurt | *(letzter Job)* | Talentscout im Anzug |

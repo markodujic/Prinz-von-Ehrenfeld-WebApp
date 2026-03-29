@@ -1,0 +1,22 @@
+[
+  { "id": "player_keV", "name": "Kev (player)", "prompt": "16-bit SNES style side view character: Kev, young male in a hoodie and cap, neutral standing/walking pose, pixel art, transparent background", "width": 64, "height": 64, "pixel": true, "bg_mode": "transparent" },
+  { "id": "player_silla", "name": "Silla (player)", "prompt": "16-bit SNES style side view character: Silla, slim athletic female wearing a racing jacket and sneakers, dynamic running pose, pixel art, transparent background", "width": 64, "height": 64, "pixel": true, "bg_mode": "transparent" },
+  { "id": "player_jojo", "name": "Jojo (player)", "prompt": "16-bit SNES style side view character: Jojo, stocky character in a colorful carnival outfit, heavy stance, pixel art, transparent background", "width": 64, "height": 64, "pixel": true, "bg_mode": "transparent" },
+
+  { "id": "enemy_tourist", "name": "Tourist with selfie-stick", "prompt": "16-bit SNES style side view enemy: tourist with selfie-stick, slow walk, pixel art, transparent background", "width": 48, "height": 64, "pixel": true, "bg_mode": "transparent" },
+  { "id": "enemy_ordnungsamt", "name": "Ordnungsamt officer", "prompt": "16-bit SNES style side view enemy: uniformed officer with ticket-book, patrol stance, pixel art, transparent background", "width": 48, "height": 64, "pixel": true, "bg_mode": "transparent" },
+  { "id": "enemy_doorguard", "name": "Door guard (Türsteher)", "prompt": "16-bit SNES style side view enemy: big doorman in suit, heavy guard stance, pixel art, transparent background", "width": 56, "height": 72, "pixel": true, "bg_mode": "transparent" },
+
+  { "id": "boss_broemmelkamp_p1", "name": "Boss Brömmelkamp Phase 1", "prompt": "16-bit SNES style boss: Hauptkommissar Brömmelkamp throwing paperwork, slow predictable movement, side view, pixel art, transparent background", "width": 96, "height": 96, "pixel": true, "bg_mode": "transparent" },
+  { "id": "boss_broemmelkamp_p2", "name": "Boss Brömmelkamp Phase 2", "prompt": "16-bit SNES style boss: Hauptkommissar Brömmelkamp with adds and shield, more aggressive, side view, pixel art, transparent background", "width": 96, "height": 96, "pixel": true, "bg_mode": "transparent" },
+  { "id": "boss_broemmelkamp_p3", "name": "Boss Brömmelkamp Phase 3", "prompt": "16-bit SNES style boss: Hauptkommissar Brömmelkamp enraged, projectiles homing, dramatic pose, side view, pixel art, transparent background", "width": 128, "height": 128, "pixel": true, "bg_mode": "transparent" },
+
+  { "id": "collectible_kroenze", "name": "Kölsch-Krone collectible", "prompt": "16-bit SNES style collectible: small beer bottle crown coin, gold, shiny pixel art icon, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" },
+  { "id": "collectible_sticker", "name": "Veedel-Sticker collectible", "prompt": "16-bit SNES style sticker: colorful round sticker with 'Veedel' motif, pixel art icon, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" },
+
+  { "id": "powerup_speed", "name": "PowerUp: Schnell-Kölsch", "prompt": "16-bit SNES style power-up icon: small bottle with speed lines, pixel art, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" },
+  { "id": "powerup_shield", "name": "PowerUp: Shield", "prompt": "16-bit SNES style power-up icon: small shield with sparkle, pixel art, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" },
+  { "id": "powerup_invuln", "name": "PowerUp: Unverwundbar", "prompt": "16-bit SNES style power-up icon: glowing star, pixel art, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" },
+  { "id": "powerup_life", "name": "PowerUp: Extra Life", "prompt": "16-bit SNES style power-up icon: small heart icon, pixel art, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" },
+  { "id": "powerup_superjump", "name": "PowerUp: Megasprung", "prompt": "16-bit SNES style power-up icon: upward arrow with burst, pixel art, transparent background, 32x32", "width": 32, "height": 32, "pixel": true, "bg_mode": "transparent" }
+]
