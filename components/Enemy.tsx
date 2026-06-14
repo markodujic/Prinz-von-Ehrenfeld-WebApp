@@ -8,7 +8,16 @@ type Props = EnemyDef & {
   platforms: Platform[];
   onDamagePlayer: (enemyId: string) => void;
   onDefeated: (enemyId: string) => void;
+  bottleThrows: BottleThrow[];
+  onBottleHit: (enemyId: string, bottleId: string) => void;
   playerPos: { x: number; y: number };  // Sprite-Position des Spielers
+};
+
+type BottleThrow = {
+  id: number;
+  x: number;
+  y: number;
+  direction: 1 | -1;
 };
 
 // Physik-Konstanten (Tourist ist langsamer als Kev)
@@ -32,6 +41,10 @@ const T_HIT_OFFSET_X = 10;
 const T_HIT_OFFSET_Y = 10;
 const T_HIT_W        = 28;
 const T_HIT_H        = 50;
+const BOTTLE_HIT_OFFSET_X = 2;
+const BOTTLE_HIT_OFFSET_Y = 4;
+const BOTTLE_HIT_W        = 14;
+const BOTTLE_HIT_H        = 22;
 
 const WALK_FPS = 8;
 const FOTO_FPS = 3;
@@ -55,7 +68,7 @@ type AIState = 'wander' | 'foto_stop';
 export default function Enemy({
   id, x: startX, patrolMin, patrolMax,
   defeated, groundY, platforms,
-  onDamagePlayer, onDefeated, playerPos,
+  onDamagePlayer, onDefeated, bottleThrows, onBottleHit, playerPos,
 }: Props) {
   const initY = groundY - T_HIT_OFFSET_Y - T_HIT_H;
   const [spritePos, setSpritePos] = useState({ x: startX, y: initY });
@@ -73,6 +86,7 @@ export default function Enemy({
   const frameIdxRef  = useRef(0);
   const platformsRef = useRef(platforms);
   const playerPosRef = useRef(playerPos);
+  const bottleThrowsRef = useRef(bottleThrows);
   const defeatedRef  = useRef(defeated);
   const damagedCooldown = useRef(0);  // Schaden-Cooldown (Sekunden)
 
@@ -81,6 +95,7 @@ export default function Enemy({
 
   useEffect(() => { platformsRef.current = platforms; }, [platforms]);
   useEffect(() => { playerPosRef.current = playerPos; }, [playerPos]);
+  useEffect(() => { bottleThrowsRef.current = bottleThrows; }, [bottleThrows]);
   useEffect(() => { defeatedRef.current = defeated; }, [defeated]);
 
   function randomFotoInterval() {
@@ -205,6 +220,20 @@ export default function Enemy({
         }
       }
 
+      // ----- Bierflaschen-Treffer -----
+      const tHbX = nextX + T_HIT_OFFSET_X;
+      const tHbY = nextY + T_HIT_OFFSET_Y;
+      for (const bottle of bottleThrowsRef.current) {
+        const bottleHbX = bottle.x + BOTTLE_HIT_OFFSET_X;
+        const bottleHbY = bottle.y + BOTTLE_HIT_OFFSET_Y;
+        const overlapBottleX = bottleHbX + BOTTLE_HIT_W > tHbX && bottleHbX < tHbX + T_HIT_W;
+        const overlapBottleY = bottleHbY + BOTTLE_HIT_H > tHbY && bottleHbY < tHbY + T_HIT_H;
+        if (overlapBottleX && overlapBottleY) {
+          onBottleHit(id, bottle.id.toString());
+          break;
+        }
+      }
+
       rafRef.current = requestAnimationFrame(step);
     };
 
@@ -214,7 +243,7 @@ export default function Enemy({
       rafRef.current = null;
       lastRef.current = null;
     };
-  }, [defeated, groundY, id, onDamagePlayer, onDefeated, patrolMax, patrolMin]);
+  }, [defeated, groundY, id, onBottleHit, onDamagePlayer, onDefeated, patrolMax, patrolMin]);
 
   if (defeated) return null;
 

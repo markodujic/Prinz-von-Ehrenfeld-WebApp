@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Player from '../components/Player';
 import Collectible from '../components/Collectible';
 import Enemy from '../components/Enemy';
@@ -20,6 +20,38 @@ import {
 
 const COLLECTIBLE_SIZE = 32;
 const INITIAL_LIVES = 3;
+const BOTTLE_SPEED = 640;
+const BOTTLE_ARC_HEIGHT = 28;
+const BOTTLE_LIFETIME_MS = 860;
+const BOTTLE_THROW_SPRITE = require('../assets/sprites/Bottle_throw.png');
+const BOTTLE_SHATTER_SPRITE = require('../assets/sprites/Bottle_shatter.png');
+const BOTTLE_SHATTER_LIFETIME_MS = 220;
+
+type BottleThrow = {
+  id: number;
+  startX: number;
+  startY: number;
+  direction: 1 | -1;
+  spawnTime: number;
+};
+
+type ActiveBottleThrow = BottleThrow & {
+  x: number;
+  y: number;
+  rotationDeg: number;
+  opacity: number;
+};
+
+type BottleBurst = {
+  id: number;
+  x: number;
+  y: number;
+  spawnTime: number;
+};
+
+type ActiveBottleBurst = BottleBurst & {
+  opacity: number;
+};
 
 type DebugEvent = {
   id: number;
@@ -45,17 +77,79 @@ export default function Page() {
   const [resetKey,     setResetKey]         = useState(0);   // Level neu starten
   const [playerSnapshot, setPlayerSnapshot] = useState<PlayerSnapshot | null>(null);
   const [debugEvents, setDebugEvents]       = useState<DebugEvent[]>([]);
+  const [bottleThrows, setBottleThrows]     = useState<BottleThrow[]>([]);
+  const [bottleBursts, setBottleBursts]     = useState<BottleBurst[]>([]);
+  const [projectileNow, setProjectileNow]   = useState(() => Date.now());
 
   // Spieler-Position für Enemy-Kollisionscheck
   const playerPosRef = useRef({ x: LEVEL1_START_X, y: 0 });
+  const playerSnapshotRef = useRef<PlayerSnapshot | null>(null);
+  const defeatedIdsRef = useRef(defeatedIds);
   const [playerPos,  setPlayerPos]          = useState({ x: LEVEL1_START_X, y: 0 });
   const debugEventIdRef = useRef(1);
+  const bottleIdRef = useRef(1);
+  const bottleBurstIdRef = useRef(1);
+  const consumedBottleIdsRef = useRef<Set<number>>(new Set());
 
   const { play } = useSound();
 
   // Damit onCollectItem keine unnötigen Re-Renders via dep-Array auslöst
   const collectedIdsRef = useRef(collectedIds);
   collectedIdsRef.current = collectedIds;
+  defeatedIdsRef.current = defeatedIds;
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      setProjectileNow(Date.now());
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    setBottleThrows(prev => {
+      const next = prev.filter(bottle => projectileNow - bottle.spawnTime <= BOTTLE_LIFETIME_MS);
+      return next.length === prev.length ? prev : next;
+    });
+    setBottleBursts(prev => {
+      const next = prev.filter(burst => projectileNow - burst.spawnTime <= BOTTLE_SHATTER_LIFETIME_MS);
+      return next.length === prev.length ? prev : next;
+    });
+  }, [projectileNow]);
+
+  const activeBottleThrows: ActiveBottleThrow[] = useMemo(() => {
+    return bottleThrows.flatMap(bottle => {
+      const age = projectileNow - bottle.spawnTime;
+      if (age < 0 || age > BOTTLE_LIFETIME_MS) return [];
+
+      const progress = age / BOTTLE_LIFETIME_MS;
+      const travel = BOTTLE_SPEED * (age / 1000);
+      const spin = (progress * 540) + 24;
+      return [{
+        ...bottle,
+        x: bottle.startX + bottle.direction * travel,
+        y: bottle.startY - Math.sin(progress * Math.PI) * BOTTLE_ARC_HEIGHT,
+        rotationDeg: bottle.direction === 1 ? spin : -spin,
+        opacity: Math.max(0.25, 1 - progress * 0.22),
+      }];
+    });
+  }, [bottleThrows, projectileNow]);
+
+  const activeBottleBursts: ActiveBottleBurst[] = useMemo(() => {
+    return bottleBursts.flatMap(burst => {
+      const age = projectileNow - burst.spawnTime;
+      if (age < 0 || age > BOTTLE_SHATTER_LIFETIME_MS) return [];
+
+      const progress = age / BOTTLE_SHATTER_LIFETIME_MS;
+      return [{
+        ...burst,
+        opacity: Math.max(0, 1 - progress),
+      }];
+    });
+  }, [bottleBursts, projectileNow]);
 
   const pushDebugEvent = useCallback((label: string, detail: string) => {
     setDebugEvents(prev => {
@@ -95,21 +189,88 @@ export default function Page() {
     setDefeatedIds(prev => {
       const next = new Set(prev);
       next.add(id);
+      defeatedIdsRef.current = next;
       return next;
     });
     setScore(s => s + 25);
     play('stomp');
   }, [play, pushDebugEvent]);
 
+  const handleBottleThrow = useCallback(() => {
+    const snapshot = playerSnapshotRef.current;
+    if (!snapshot) return;
+
+    const direction: 1 | -1 = snapshot.facingLeft ? -1 : 1;
+    const startX = snapshot.position.x + (direction === 1 ? 42 : -6);
+    const startY = snapshot.position.y + 18;
+    const id = bottleIdRef.current++;
+
+    pushDebugEvent('throw', `bottle ${id}`);
+    setBottleThrows(prev => [
+      ...prev,
+      {
+        id,
+        startX,
+        startY,
+        direction,
+        spawnTime: Date.now(),
+      },
+    ]);
+    play('throw_bottle');
+  }, [play, pushDebugEvent]);
+
+  const handleBottleHit = useCallback((enemyId: string, bottleId: string) => {
+    const numericBottleId = Number(bottleId);
+    if (consumedBottleIdsRef.current.has(numericBottleId)) return;
+    consumedBottleIdsRef.current.add(numericBottleId);
+
+    if (defeatedIdsRef.current.has(enemyId)) return;
+
+    const bottle = activeBottleThrows.find(item => item.id === numericBottleId);
+    if (bottle) {
+      setBottleBursts(prev => [
+        ...prev,
+        {
+          id: bottleBurstIdRef.current++,
+          x: bottle.x,
+          y: bottle.y,
+          spawnTime: Date.now(),
+        },
+      ]);
+    }
+
+    pushDebugEvent('bottle', `${bottleId} -> ${enemyId}`);
+    setBottleThrows(prev => prev.filter(bottle => bottle.id !== numericBottleId));
+    setDefeatedIds(prev => {
+      if (prev.has(enemyId)) return prev;
+      const next = new Set(prev);
+      next.add(enemyId);
+      defeatedIdsRef.current = next;
+      return next;
+    });
+    setScore(s => s + 25);
+    play('bottle_hit');
+  }, [activeBottleThrows, play, pushDebugEvent]);
+
   const handlePositionChange = useCallback((pos: { x: number; y: number }) => {
     playerPosRef.current = pos;
     setPlayerPos(pos);
+  }, []);
+
+  const handlePlayerSnapshot = useCallback((snapshot: PlayerSnapshot) => {
+    playerSnapshotRef.current = snapshot;
+    setPlayerSnapshot(snapshot);
   }, []);
 
   const handleRestart = useCallback(() => {
     pushDebugEvent('restart', 'reset level state');
     setCollectedIds(new Set());
     setDefeatedIds(new Set());
+    defeatedIdsRef.current = new Set();
+    setBottleThrows([]);
+    consumedBottleIdsRef.current = new Set();
+    playerSnapshotRef.current = null;
+    setPlayerSnapshot(null);
     setLives(INITIAL_LIVES);
     setScore(0);
     setLevelComplete(false);
@@ -165,8 +326,45 @@ export default function Page() {
             groundY={groundY}
             platforms={LEVEL1_PLATFORMS}
             playerPos={playerPos}
+            bottleThrows={activeBottleThrows}
             onDamagePlayer={handleTakeDamage}
             onDefeated={handleEnemyDefeated}
+            onBottleHit={handleBottleHit}
+          />
+        ))}
+
+        {activeBottleThrows.map(bottle => (
+          <Image
+            key={`bottle-${bottle.id}`}
+            source={BOTTLE_THROW_SPRITE}
+            style={[
+              styles.bottleSprite,
+              {
+                left: bottle.x,
+                top: bottle.y,
+                opacity: bottle.opacity,
+                transform: [{ rotate: `${bottle.rotationDeg}deg` }],
+              },
+            ]}
+            pointerEvents="none"
+            resizeMode="contain"
+          />
+        ))}
+
+        {activeBottleBursts.map(burst => (
+          <Image
+            key={`bottle-burst-${burst.id}`}
+            source={BOTTLE_SHATTER_SPRITE}
+            style={[
+              styles.bottleBurst,
+              {
+                left: burst.x - 4,
+                top: burst.y - 4,
+                opacity: burst.opacity,
+              },
+            ]}
+            pointerEvents="none"
+            resizeMode="contain"
           />
         ))}
 
@@ -182,7 +380,8 @@ export default function Page() {
           onTakeDamage={() => handleTakeDamage('player')}
           onPositionChange={handlePositionChange}
           onJump={() => play('jump')}
-          onSnapshot={setPlayerSnapshot}
+          onThrowBottle={handleBottleThrow}
+          onSnapshot={handlePlayerSnapshot}
         />
 
         {playerSnapshot && (
@@ -225,7 +424,7 @@ export default function Page() {
         <Text style={styles.hudText}>📍 {stickerCollected}/{stickerTotal}</Text>
         <Text style={styles.hudText}>{'❤️ '.repeat(Math.max(0, lives)).trim() || '💀'}</Text>
         <Text style={[styles.hudText, styles.scoreText]}>Score: {score}</Text>
-        <Text style={styles.hudHint}>Pfeiltasten / A D · Leertaste zum Springen</Text>
+        <Text style={styles.hudHint}>Pfeiltasten / A D · Leertaste zum Springen · F zum Flaschenwerfen</Text>
       </View>
     </View>
   );
@@ -247,6 +446,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffc84a',
     borderRadius: 4,
+  },
+  bottleSprite: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    zIndex: 55,
+  },
+  bottleBurst: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    zIndex: 56,
   },
   ground: {
     position: 'absolute',

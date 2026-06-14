@@ -53,31 +53,37 @@ def draw_frame(idx):
     img = Image.new('RGBA', (CANVAS_W, CANVAS_H), TRANSPARENT)
     d   = ImageDraw.Draw(img)
 
-    t     = (idx / NUM_FRAMES) * math.pi * 2
-    bob   = int(round(abs(math.sin(t * 2)) * 1.5))
+    phase = idx % NUM_FRAMES
+    pose = [
+        {'bob': 0, 'lean': -2, 'front_leg': 8,  'back_leg': -6, 'front_foot': 7,  'back_foot': -5, 'arm': -2, 'stick': -6},
+        {'bob': 2, 'lean': -1, 'front_leg': 4,  'back_leg': -2, 'front_foot': 4,  'back_foot': -2, 'arm': 1,  'stick': -3},
+        {'bob': 1, 'lean': 2,  'front_leg': -5, 'back_leg': 8,  'front_foot': -4, 'back_foot': 7,  'arm': 3,  'stick': 0},
+        {'bob': 0, 'lean': 2,  'front_leg': -8, 'back_leg': 6,  'front_foot': -7, 'back_foot': 5,  'arm': 2,  'stick': 6},
+        {'bob': 2, 'lean': 1,  'front_leg': -4, 'back_leg': 2,  'front_foot': -4, 'back_foot': 2,  'arm': -1, 'stick': 3},
+        {'bob': 1, 'lean': -2, 'front_leg': 5,  'back_leg': -8, 'front_foot': 4,  'back_foot': -7, 'arm': -3, 'stick': 0},
+    ][phase]
 
     BASE_Y  = 61
     cx      = 22
-    hip_y   = BASE_Y - 19 + bob
+    hip_y   = BASE_Y - 19 + pose['bob']
     chest_y = hip_y  - 12
     neck_y  = chest_y - 2
     head_cy = neck_y  - 6
 
-    swing = math.sin(t) * 10
-    fk_x = cx + int(swing * 0.5); fk_y = hip_y + 9
-    ff_x = cx + int(swing)
-    bk_x = cx - int(swing * 0.5); bk_y = hip_y + 9
-    bf_x = cx - int(swing)
+    torso_lean = pose['lean']
+    fk_x = cx + pose['front_leg']; fk_y = hip_y + 10
+    ff_x = cx + pose['front_foot']
+    bk_x = cx + pose['back_leg']; bk_y = hip_y + 9
+    bf_x = cx + pose['back_foot']
 
     # Selfie-Stick-Arm: immer ausgestreckt nach vorne-oben
-    arm_swing_fwd = math.sin(t) * 4
     stick_base_x = cx + 8
     stick_base_y = chest_y + 4
     stick_tip_x  = stick_base_x + 10
-    stick_tip_y  = chest_y - 8
+    stick_tip_y  = chest_y - 8 + pose['stick']
 
     # Rueckwaertiger Arm schwingt
-    bae_x = cx - 5 + int(-math.sin(t) * 6)
+    bae_x = cx - 5 + pose['arm']
     bae_y = chest_y + 12
 
     # ---- Ruecksack ----------------------------------------------------------
@@ -86,7 +92,7 @@ def draw_frame(idx):
         hline(d, cx - 9, cx - 2, ry, shade)
 
     # ---- Hinteres Bein ------------------------------------------------------
-    d.line([(cx, hip_y), (bk_x, bk_y)],        fill=SHORTS_SHD, width=4)
+    d.line([(cx - 1, hip_y), (bk_x, bk_y)],        fill=SHORTS_SHD, width=4)
     d.line([(bk_x, bk_y), (bf_x, BASE_Y - 2)], fill=SHORTS_SHD, width=3)
     hline(d, bf_x - 4, bf_x + 4, BASE_Y - 1, SHOE_TOP)
     hline(d, bf_x - 4, bf_x + 4, BASE_Y,     SHOE_SOLE)
@@ -97,13 +103,13 @@ def draw_frame(idx):
     # ---- Torso --------------------------------------------------------------
     for ty in range(chest_y, hip_y + 2):
         hw = 7 if ty < chest_y + 5 else 6
-        hline(d, cx - hw + 1, cx + hw - 1, ty, SHIRT)
+        hline(d, cx - hw + 1 + torso_lean, cx + hw - 1 + torso_lean, ty, SHIRT)
     vline(d, cx + 4, chest_y + 2, hip_y, SHIRT_SHD)
-    d.rectangle([cx - 7, chest_y, cx + 7, hip_y + 1], outline=OUTLINE)
+    d.rectangle([cx - 7 + torso_lean, chest_y, cx + 7 + torso_lean, hip_y + 1], outline=OUTLINE)
 
     # ---- Selfie-Stick (vorderer Arm + Stick) --------------------------------
     # Arm
-    d.line([(cx + 6, chest_y + 2), (stick_base_x, stick_base_y + 4)], fill=SKIN, width=2)
+    d.line([(cx + 6 + torso_lean, chest_y + 2), (stick_base_x, stick_base_y + 4)], fill=SKIN, width=2)
     # Stick-Stange
     d.line([(stick_base_x, stick_base_y + 4), (stick_tip_x, stick_tip_y)], fill=STICK, width=2)
     # Handy oben
@@ -112,7 +118,7 @@ def draw_frame(idx):
     px(d, stick_tip_x, stick_tip_y - 2, (100, 200, 255, 255))
 
     # ---- Vorderes Bein ------------------------------------------------------
-    d.line([(cx, hip_y), (fk_x, fk_y)],        fill=SHORTS, width=4)
+    d.line([(cx + 1, hip_y), (fk_x, fk_y)],        fill=SHORTS, width=4)
     d.line([(fk_x, fk_y), (ff_x, BASE_Y - 2)], fill=SHORTS, width=3)
     hline(d, ff_x - 4, ff_x + 5, BASE_Y - 2, SHOE_TOP)
     hline(d, ff_x - 5, ff_x + 5, BASE_Y,     SHOE_SOLE)
@@ -130,12 +136,24 @@ def draw_frame(idx):
     px(d, cx + 6, head_cy, OUTLINE)
 
     # Auge
-    px(d, cx + 3, head_cy, OUTLINE)
-    px(d, cx + 4, head_cy, OUTLINE)
+    eye_shift = torso_lean // 2
+    px(d, cx + 3 + eye_shift, head_cy, OUTLINE)
+    px(d, cx + 4 + eye_shift, head_cy, OUTLINE)
 
     # Mund (leichtes Laecheln)
     hline(d, cx + 1, cx + 4, head_cy + 3, OUTLINE)
     px(d, cx + 4, head_cy + 2, OUTLINE)
+
+    # Bewegungsakzente fuer klarere Walking-Frames
+    if phase in (0, 3):
+        px(d, cx - 8, BASE_Y - 6, OUTLINE)
+        px(d, cx - 9, BASE_Y - 5, OUTLINE)
+    elif phase in (1, 4):
+        px(d, cx + 9, BASE_Y - 7, OUTLINE)
+        px(d, cx + 10, BASE_Y - 6, OUTLINE)
+    else:
+        px(d, cx + 8, BASE_Y - 8, OUTLINE)
+        px(d, cx + 9, BASE_Y - 7, OUTLINE)
 
     # Haare / Muetze
     hline(d, cx - 4, cx + 5, head_cy - 5, HAT)

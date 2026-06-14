@@ -8,6 +8,12 @@
 
 **Input**: User description: "debugge die app"
 
+## Clarifications
+
+### Session 2026-06-14
+
+- Q: Welche Beweise sollen einen Fehlerfall beschreiben? → A: Reproduktionsschritte plus Console-/Runtime-Fehler und, wenn verfügbar, Screenshot oder Screenrecording.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Reproduce Critical Issues (Priority: P1)
@@ -16,7 +22,7 @@ As a maintainer, I can capture and replay the conditions that lead to a visible 
 
 **Why this priority**: A reproducible issue is the fastest path to a reliable fix and removes the biggest blocker for users.
 
-**Independent Test**: Trigger a known failure condition and verify that the resulting context is sufficient to reproduce the issue without additional guesswork.
+**Independent Test**: Trigger a known failure condition and verify that the resulting context, including reproductionschritte, Console-/Runtime-Fehler und optionales Bildmaterial, is sufficient to reproduce the issue without additional guesswork.
 
 **Acceptance Scenarios**:
 
@@ -64,7 +70,7 @@ As a maintainer, I can verify that a change resolved the issue and did not break
 ### Functional Requirements
 
 - **FR-001**: The debugging workflow MUST support identifying a user-visible failure from the current app behavior.
-- **FR-002**: The debugging workflow MUST preserve enough context to reproduce the failure path.
+- **FR-002**: The debugging workflow MUST preserve enough context to reproduce the failure path, including reproduction steps, Console-/Runtime-Fehler, and optional screenshots or screen recordings when available.
 - **FR-003**: The debugging workflow MUST help distinguish the failing part of the app from the parts that still work.
 - **FR-004**: The debugging workflow MUST support verifying that a fix removes the original failure.
 - **FR-005**: The debugging workflow MUST support confirming that normal app behavior still works after the fix.

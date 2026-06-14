@@ -3,21 +3,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "expo lint",
-    "sprite:generate": "bash ./scripts/run-generate.sh",
-    "sprite:generate:ps": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/run-generate.ps1",
-    "sprite:deploy-player": "bash ./scripts/move-latest-to-player.sh",
-    "sprite:deploy-player:ps": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/move-latest-to-player.ps1"
-    ,"sprite:generate:batch": "bash ./scripts/generate-batch.sh",
-    "sprite:generate:batch:ps": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/generate-batch.ps1"
-  },
-  "scripts": {
-    "sprite:watch": "node ./scripts/watch-batch.js"
+    "sprite:watch": "node ./scripts/watch-batch.js",
+    "lint": "expo lint"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

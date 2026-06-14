@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, Animated } from 'react-native';
+import { Image, StyleSheet, Animated, View } from 'react-native';
 import type { CollectibleDef } from '../constants/level1';
 
 type Props = CollectibleDef & {
@@ -75,8 +75,9 @@ export default function Collectible({ id, x, y, type, collected, onCollect }: Pr
     // Nach der Animation komplett ausblenden
   }
 
-  const size = type === 'koelsch' ? KRONE_SIZE : STICKER_SIZE;
-  const source = type === 'koelsch' ? KRONE_FRAMES[frameIdx] : STICKER_IMG;
+  const isKoelsch = type === 'koelsch';
+  const size = isKoelsch ? KRONE_SIZE + 6 : STICKER_SIZE;
+  const source = isKoelsch ? KRONE_FRAMES[frameIdx] : STICKER_IMG;
 
   return (
     <Animated.View
@@ -93,6 +94,7 @@ export default function Collectible({ id, x, y, type, collected, onCollect }: Pr
       ]}
       pointerEvents="none"
     >
+      {isKoelsch ? <View style={styles.glow} /> : null}
       <Image source={source} style={{ width: size, height: size }} resizeMode="contain" />
     </Animated.View>
   );
@@ -101,5 +103,18 @@ export default function Collectible({ id, x, y, type, collected, onCollect }: Pr
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
+  },
+  glow: {
+    position: 'absolute',
+    left: 2,
+    top: 2,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 220, 90, 0.16)',
+    shadowColor: '#ffd45a',
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
   },
 });

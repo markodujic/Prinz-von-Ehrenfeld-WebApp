@@ -34,9 +34,9 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No story-specific verification should start until this shared debug surface exists
 
-- [ ] T003 [P] Add a lightweight player-state snapshot helper in `components/Player.tsx` for position, velocity, grounded state, and collision contact
-- [ ] T004 [P] Surface the snapshot in a minimal debug overlay in `app/index.tsx` so the live repro can be inspected during play
-- [ ] T005 Extract the collision and reset logic into named helper functions in `components/Player.tsx` so the failing path is easier to isolate
+- [X] T003 [P] Add a lightweight player-state snapshot helper in `components/Player.tsx` for position, velocity, grounded state, and collision contact
+- [X] T004 [P] Surface the snapshot in a minimal debug overlay in `app/index.tsx` so the live repro can be inspected during play
+- [X] T005 Extract the collision and reset logic into named helper functions in `components/Player.tsx` so the failing path is easier to isolate
 
 **Checkpoint**: The app exposes enough live state to reproduce and inspect a failure without guessing
 

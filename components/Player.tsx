@@ -16,6 +16,18 @@ type CollectibleHit = {
   size: number;
 };
 
+type PlayerVector = {
+  x: number;
+  y: number;
+};
+
+type PlayerHitbox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type Props = {
   startX?: number;
   groundY?: number;
@@ -26,6 +38,7 @@ type Props = {
   onTakeDamage?: () => void;
   onPositionChange?: (pos: { x: number; y: number }) => void;
   onJump?: () => void;
+  onThrowBottle?: () => void;
   onSnapshot?: (snapshot: PlayerSnapshot) => void;
 };
 
@@ -36,6 +49,106 @@ export type PlayerSnapshot = {
   grounded: boolean;
   velocity: { x: number; y: number };
 };
+
+function getPlayerHitbox(position: PlayerVector): PlayerHitbox {
+  return {
+    x: position.x + HIT_OFFSET_X,
+    y: position.y + HIT_OFFSET_Y,
+    width: HIT_W,
+    height: HIT_H,
+  };
+}
+
+function resolveLandingCollision({
+  nextX,
+  nextY,
+  previousFeetY,
+  velocityY,
+  platform,
+}: {
+  nextX: number;
+  nextY: number;
+  previousFeetY: number;
+  velocityY: number;
+  platform: GamePlatform;
+}) {
+  const hitbox = getPlayerHitbox({ x: nextX, y: nextY });
+  const overlapX = hitbox.x + hitbox.width > platform.x && hitbox.x < platform.x + platform.width;
+  const feetY = hitbox.y + hitbox.height;
+  const feetReach = feetY >= platform.y;
+  const wasAbove = previousFeetY <= platform.y + 6;
+
+  if (overlapX && feetReach && wasAbove && velocityY >= 0) {
+    return {
+      nextY: platform.y - HIT_OFFSET_Y - HIT_H,
+      velocityY: 0,
+      landed: true,
+    };
+  }
+
+  return {
+    nextY,
+    velocityY,
+    landed: false,
+  };
+}
+
+function resolveCeilingCollision({
+  nextX,
+  nextY,
+  previousHeadY,
+  velocityY,
+  platform,
+}: {
+  nextX: number;
+  nextY: number;
+  previousHeadY: number;
+  velocityY: number;
+  platform: GamePlatform;
+}) {
+  const hitbox = getPlayerHitbox({ x: nextX, y: nextY });
+  const overlapX = hitbox.x + hitbox.width > platform.x && hitbox.x < platform.x + platform.width;
+  const headHitsBottom = hitbox.y <= platform.y + platform.height;
+  const wasBelowPlatform = previousHeadY >= platform.y + platform.height - 6;
+
+  if (overlapX && headHitsBottom && wasBelowPlatform && velocityY < 0) {
+    return {
+      nextY: platform.y + platform.height - HIT_OFFSET_Y,
+      velocityY: 0,
+      collided: true,
+    };
+  }
+
+  return {
+    nextY,
+    velocityY,
+    collided: false,
+  };
+}
+
+function buildSnapshot({
+  position,
+  spriteFrame,
+  facingLeft,
+  grounded,
+  velocity,
+}: PlayerSnapshot): PlayerSnapshot {
+  return {
+    position,
+    spriteFrame,
+    facingLeft,
+    grounded,
+    velocity,
+  };
+}
+
+function resetLoopState(
+  rafRef: { current: number | null },
+  lastRef: { current: number | null },
+) {
+  rafRef.current = null;
+  lastRef.current = null;
+}
 
 const SIZE = 64;
 
@@ -49,6 +162,7 @@ const MOVE_SPEED = 300;
 const JUMP_VELOCITY = -650;
 const RUN_FPS = 12;
 const IDLE_FPS = 8;
+const THROW_COOLDOWN_MS = 320;
 
 const RUN_FRAMES = [
   require('../assets/sprites/Kev_run_1.png'),
@@ -82,6 +196,7 @@ export default function Player({
   onTakeDamage,
   onPositionChange,
   onJump,
+  onThrowBottle,
   onSnapshot,
 }: Props) {
   const initY = groundY - HIT_OFFSET_Y - HIT_H;
@@ -97,7 +212,9 @@ export default function Player({
   const onTakeDamageRef = useRef(onTakeDamage);
   const onPositionChangeRef = useRef(onPositionChange);
   const onJumpRef = useRef(onJump);
+  const onThrowBottleRef = useRef(onThrowBottle);
   const onSnapshotRef = useRef(onSnapshot);
+  const lastThrowAtRef = useRef(0);
   const frameTimeRef = useRef(0);
   const frameIdxRef = useRef(0);
   const idleTimeRef = useRef(0);
@@ -112,11 +229,22 @@ export default function Player({
   useEffect(() => { onTakeDamageRef.current = onTakeDamage; }, [onTakeDamage]);
   useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
   useEffect(() => { onJumpRef.current = onJump; }, [onJump]);
+  useEffect(() => { onThrowBottleRef.current = onThrowBottle; }, [onThrowBottle]);
   useEffect(() => { onSnapshotRef.current = onSnapshot; }, [onSnapshot]);
+
+  const triggerBottleThrow = () => {
+    const now = Date.now();
+    if (now - lastThrowAtRef.current < THROW_COOLDOWN_MS) return;
+    lastThrowAtRef.current = now;
+    onThrowBottleRef.current?.();
+  };
 
   useEffect(() => {
     function down(e: KeyboardEvent) {
       keys.current[e.code] = true;
+      if (e.code === 'KeyF' && !e.repeat) {
+        triggerBottleThrow();
+      }
     }
     function up(e: KeyboardEvent) {
       keys.current[e.code] = false;
@@ -159,28 +287,33 @@ export default function Player({
       let landed = false;
 
       for (const p of platformsRef.current) {
-        const hbX = nextX + HIT_OFFSET_X;
-        const overlapX = hbX + HIT_W > p.x && hbX < p.x + p.width;
+        const landing = resolveLandingCollision({
+          nextX,
+          nextY,
+          previousFeetY: posRef.current.y + HIT_OFFSET_Y + HIT_H,
+          velocityY: vel.current.y,
+          platform: p,
+        });
 
-        const feetY = nextY + HIT_OFFSET_Y + HIT_H;
-        const prevFeetY = posRef.current.y + HIT_OFFSET_Y + HIT_H;
-        const feetReach = feetY >= p.y;
-        const wasAbove = prevFeetY <= p.y + 6;
-        if (overlapX && feetReach && wasAbove && vel.current.y >= 0) {
-          nextY = p.y - HIT_OFFSET_Y - HIT_H;
-          vel.current.y = 0;
+        if (landing.landed) {
+          nextY = landing.nextY;
+          vel.current.y = landing.velocityY;
           landed = true;
           break;
         }
 
         if (p.solid) {
-          const headY = nextY + HIT_OFFSET_Y;
-          const prevHeadY = posRef.current.y + HIT_OFFSET_Y;
-          const headHitsBottom = headY <= p.y + p.height;
-          const wasBelowPlatform = prevHeadY >= p.y + p.height - 6;
-          if (overlapX && headHitsBottom && wasBelowPlatform && vel.current.y < 0) {
-            nextY = p.y + p.height - HIT_OFFSET_Y;
-            vel.current.y = 0;
+          const ceiling = resolveCeilingCollision({
+            nextX,
+            nextY,
+            previousHeadY: posRef.current.y + HIT_OFFSET_Y,
+            velocityY: vel.current.y,
+            platform: p,
+          });
+
+          if (ceiling.collided) {
+            nextY = ceiling.nextY;
+            vel.current.y = ceiling.velocityY;
           }
         }
       }
@@ -233,21 +366,20 @@ export default function Player({
       onPositionChangeRef.current?.(newPos);
       if (left) setFacingLeft(true);
       if (right) setFacingLeft(false);
-      onSnapshotRef.current?.({
+      onSnapshotRef.current?.(buildSnapshot({
         position: newPos,
         spriteFrame: newFrame,
         facingLeft: left ? true : right ? false : facingLeft,
         grounded: landed,
         velocity: { x: vel.current.x, y: vel.current.y },
-      });
+      }));
       rafRef.current = requestAnimationFrame(step);
     };
 
     rafRef.current = requestAnimationFrame(step);
     return () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-      lastRef.current = null;
+      resetLoopState(rafRef, lastRef);
     };
   }, [containerWidth, groundY, facingLeft]);
 
@@ -257,6 +389,7 @@ export default function Player({
   const releaseRight = () => (keys.current['TouchRight'] = false);
   const pressJump = () => (keys.current['Space'] = true);
   const releaseJump = () => (keys.current['Space'] = false);
+  const pressThrow = () => triggerBottleThrow();
 
   const currentSource =
     spriteFrame === -2 ? JUMP_FRAME :
@@ -284,6 +417,9 @@ export default function Player({
         </Pressable>
         <Pressable onPressIn={pressJump} onPressOut={releaseJump} style={[styles.controlButton, styles.jumpButton]} accessibilityLabel="Jump">
           <Text style={styles.controlText}>↑</Text>
+        </Pressable>
+        <Pressable onPress={pressThrow} style={[styles.controlButton, styles.throwButton]} accessibilityLabel="Throw bottle">
+          <Text style={styles.controlText}>🍺</Text>
         </Pressable>
       </View>
     </View>
@@ -330,6 +466,9 @@ const styles = StyleSheet.create({
   },
   jumpButton: {
     backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  throwButton: {
+    backgroundColor: 'rgba(163, 114, 34, 0.78)',
   },
   controlText: {
     color: 'white',

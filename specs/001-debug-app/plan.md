@@ -10,6 +10,78 @@
 
 Stabilize the current web app by tightening the debugging workflow around the live gameplay loop, especially the single-frame loop in `components/Player.tsx`, so failures can be reproduced, isolated, and verified without broad refactors.
 
+## Research
+
+### Key Findings
+
+- The app is an Expo Router web/mobile project with the main gameplay loop concentrated in `components/Player.tsx`, `components/Enemy.tsx`, and `app/index.tsx`.
+- The most efficient debugging workflow for this codebase is to capture the visible failure, the exact repro path, and the runtime evidence from the browser, then validate with `expo lint` and the local web run.
+- The current app already has a compact single-screen structure, so the plan should avoid introducing new abstractions and instead preserve the smallest possible reproduction and verification surface.
+
+### Decisions
+
+- Use the browser web build as the primary debugging target because it is already the fastest local feedback loop for this repository.
+- Keep the debug workflow centered on observable behavior and the smallest affected code path rather than global cleanup.
+- Treat screenshots or screen recordings as optional evidence that strengthens the reproduction case, not as a hard requirement.
+
+## Data Model
+
+### Issue Report
+
+- `id`: Unique issue identifier.
+- `title`: Short human-readable description.
+- `severity`: Relative impact level.
+- `userImpact`: What the user can observe.
+- `steps`: Ordered repro steps.
+- `environment`: Relevant runtime context such as browser or local build state.
+- `evidence`: Console output, runtime errors, screenshots, or recordings.
+
+### Reproduction Case
+
+- `issueId`: Link to the originating issue.
+- `preconditions`: State required before reproduction.
+- `steps`: Minimal step list that triggers the problem.
+- `expected`: Normal behavior.
+- `actual`: Observed failing behavior.
+
+### Debug Session
+
+- `id`: Unique session identifier.
+- `issueId`: Linked issue.
+- `hypothesis`: Current suspected root cause.
+- `scope`: Files or surfaces under investigation.
+- `findings`: Notes from reproduction and isolation.
+- `status`: Open, narrowed, fixed, or verified.
+
+### Verification Result
+
+- `sessionId`: Linked debug session.
+- `fixValidated`: Whether the original failure is gone.
+- `regressionCheck`: Whether the normal flow still works.
+- `evidence`: Lint output, local runtime confirmation, or other proof.
+
+## Quickstart
+
+### Prerequisites
+
+- Node.js dependencies installed for the workspace.
+- The web app can be started locally with the existing Expo script.
+
+### Validate the Debug Flow
+
+1. Start the app with `npm run web`.
+2. Reproduce the visible failure in the browser.
+3. Record the minimal repro steps and the exact runtime evidence.
+4. Narrow the issue to the smallest likely code path.
+5. Apply the fix and confirm the same steps no longer fail.
+6. Run `npm run lint` before concluding the session.
+
+### Expected Outcome
+
+- The issue can be reproduced from the recorded context without guessing.
+- The failing surface can be isolated to a small part of the app.
+- The fix can be verified against the original failure without breaking the normal flow.
+
 ## Technical Context
 
 **Language/Version**: TypeScript 5.9 on Expo SDK 54 / React Native 0.81 / React 19
@@ -39,6 +111,13 @@ Stabilize the current web app by tightening the debugging workflow around the li
 - The smallest possible change should be preferred over architectural cleanup.
 - Debugging must be validated through focused repro and verification steps.
 - No constitution conflicts identified for this feature.
+
+## Constitution Check Revisited
+
+- Spec-first workflow remains intact after design artifact generation.
+- Expo and TypeScript are still the baseline stack for the repository.
+- The plan still prefers the smallest reproducible and verifiable change.
+- No new constitution conflicts were introduced by the design artifacts.
 
 ## Project Structure
 

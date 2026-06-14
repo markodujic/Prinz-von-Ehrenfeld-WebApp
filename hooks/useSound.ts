@@ -6,6 +6,8 @@ export type SoundName =
   | 'collect_sticker'
   | 'stomp'
   | 'damage'
+  | 'throw_bottle'
+  | 'bottle_hit'
   | 'level_complete';
 
 function getCtx(
@@ -81,6 +83,16 @@ export function useSound() {
         tone(ctx, 'sawtooth', 440, 110, 0.08, 0.3,  0.0);
         tone(ctx, 'sawtooth', 330, 80,  0.1,  0.25, 0.08);
         tone(ctx, 'sawtooth', 220, 55,  0.12, 0.2,  0.18);
+        break;
+
+      case 'throw_bottle':
+        tone(ctx, 'square', 180, 140, 0.06, 0.12);
+        tone(ctx, 'square', 140, 110, 0.08, 0.08, 0.05);
+        break;
+
+      case 'bottle_hit':
+        tone(ctx, 'sawtooth', 520, 220, 0.05, 0.12);
+        tone(ctx, 'square', 260, 70, 0.09, 0.16, 0.03);
         break;
 
       case 'level_complete': {
