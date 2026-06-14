@@ -6,6 +6,7 @@ import Enemy from '../components/Enemy';
 import GameBackground from '../components/GameBackground';
 import LevelComplete from '../components/LevelComplete';
 import { useSound } from '../hooks/useSound';
+import type { PlayerSnapshot } from '../components/Player';
 import {
   LEVEL1_PLATFORMS,
   LEVEL1_COLLECTIBLES,
@@ -19,6 +20,12 @@ import {
 
 const COLLECTIBLE_SIZE = 32;
 const INITIAL_LIVES = 3;
+
+type DebugEvent = {
+  id: number;
+  label: string;
+  detail: string;
+};
 
 function buildCollectibleHits(collectedIds: Set<string>) {
   return LEVEL1_COLLECTIBLES
@@ -36,10 +43,13 @@ export default function Page() {
   const [score,        setScore]            = useState(0);
   const [levelComplete, setLevelComplete]   = useState(false);
   const [resetKey,     setResetKey]         = useState(0);   // Level neu starten
+  const [playerSnapshot, setPlayerSnapshot] = useState<PlayerSnapshot | null>(null);
+  const [debugEvents, setDebugEvents]       = useState<DebugEvent[]>([]);
 
   // Spieler-Position für Enemy-Kollisionscheck
   const playerPosRef = useRef({ x: LEVEL1_START_X, y: 0 });
   const [playerPos,  setPlayerPos]          = useState({ x: LEVEL1_START_X, y: 0 });
+  const debugEventIdRef = useRef(1);
 
   const { play } = useSound();
 
@@ -47,8 +57,17 @@ export default function Page() {
   const collectedIdsRef = useRef(collectedIds);
   collectedIdsRef.current = collectedIds;
 
+  const pushDebugEvent = useCallback((label: string, detail: string) => {
+    setDebugEvents(prev => {
+      const next = [{ id: debugEventIdRef.current++, label, detail }, ...prev];
+      return next.slice(0, 4);
+    });
+  }, []);
+
   const handleCollect = useCallback((id: string) => {
     if (collectedIdsRef.current.has(id)) return;
+    const def = LEVEL1_COLLECTIBLES.find(c => c.id === id);
+    pushDebugEvent('collect', `${id}${def ? ` (${def.type})` : ''}`);
     setCollectedIds(prev => {
       const next = new Set(prev);
       next.add(id);
@@ -59,19 +78,20 @@ export default function Page() {
       }
       return next;
     });
-    const def = LEVEL1_COLLECTIBLES.find(c => c.id === id);
     if (def) {
       setScore(s => s + (def.type === 'koelsch' ? LEVEL1_SCORE_KOELSCH : LEVEL1_SCORE_STICKER));
       play(def.type === 'sticker' ? 'collect_sticker' : 'collect_koelsch');
     }
-  }, [play]);
+  }, [play, pushDebugEvent]);
 
   const handleTakeDamage = useCallback((_enemyId: string) => {
+    pushDebugEvent('damage', `from ${_enemyId}`);
     setLives(l => Math.max(0, l - 1));
     play('damage');
-  }, [play]);
+  }, [play, pushDebugEvent]);
 
   const handleEnemyDefeated = useCallback((id: string) => {
+    pushDebugEvent('defeat', id);
     setDefeatedIds(prev => {
       const next = new Set(prev);
       next.add(id);
@@ -79,7 +99,7 @@ export default function Page() {
     });
     setScore(s => s + 25);
     play('stomp');
-  }, [play]);
+  }, [play, pushDebugEvent]);
 
   const handlePositionChange = useCallback((pos: { x: number; y: number }) => {
     playerPosRef.current = pos;
@@ -87,13 +107,14 @@ export default function Page() {
   }, []);
 
   const handleRestart = useCallback(() => {
+    pushDebugEvent('restart', 'reset level state');
     setCollectedIds(new Set());
     setDefeatedIds(new Set());
     setLives(INITIAL_LIVES);
     setScore(0);
     setLevelComplete(false);
     setResetKey(k => k + 1);
-  }, []);
+  }, [pushDebugEvent]);
 
   const collectibleHits = useMemo(
     () => buildCollectibleHits(collectedIds),
@@ -161,7 +182,29 @@ export default function Page() {
           onTakeDamage={() => handleTakeDamage('player')}
           onPositionChange={handlePositionChange}
           onJump={() => play('jump')}
+          onSnapshot={setPlayerSnapshot}
         />
+
+        {playerSnapshot && (
+          <View style={styles.debugOverlay}>
+            <Text style={styles.debugTitle}>Debug</Text>
+            <Text style={styles.debugText}>
+              pos: {Math.round(playerSnapshot.position.x)}, {Math.round(playerSnapshot.position.y)}
+            </Text>
+            <Text style={styles.debugText}>
+              frame: {playerSnapshot.spriteFrame} · {playerSnapshot.grounded ? 'grounded' : 'air'}
+            </Text>
+            <Text style={styles.debugText}>
+              vel: {Math.round(playerSnapshot.velocity.x)}, {Math.round(playerSnapshot.velocity.y)}
+            </Text>
+            <Text style={[styles.debugText, styles.debugSeparator]}>events:</Text>
+            {debugEvents.map(event => (
+              <Text key={event.id} style={styles.debugText}>
+                {event.label}: {event.detail}
+              </Text>
+            ))}
+          </View>
+        )}
 
         {/* Level-Complete-Overlay */}
         {levelComplete && (
@@ -247,5 +290,34 @@ const styles = StyleSheet.create({
   hudHint: {
     color: '#888',
     fontSize: 12,
+  },
+  debugOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    maxWidth: 220,
+  },
+  debugTitle: {
+    color: '#ffc84a',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  debugText: {
+    color: '#fff',
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  debugSeparator: {
+    marginTop: 6,
+    color: '#ffc84a',
   },
 });

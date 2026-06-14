@@ -1,5 +1,5 @@
-import React, {useEffect, useRef, useState} from 'react';
-import {View, StyleSheet, Pressable, Text, Image} from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Pressable, Text, Image } from 'react-native';
 
 type GamePlatform = {
   x: number;
@@ -13,7 +13,7 @@ type CollectibleHit = {
   id: string;
   x: number;
   y: number;
-  size: number;  // Breite & Höhe des Collectibles
+  size: number;
 };
 
 type Props = {
@@ -26,24 +26,30 @@ type Props = {
   onTakeDamage?: () => void;
   onPositionChange?: (pos: { x: number; y: number }) => void;
   onJump?: () => void;
+  onSnapshot?: (snapshot: PlayerSnapshot) => void;
 };
 
-const SIZE = 64;      // Sprite-Größe (unveränderlich für Rendering)
+export type PlayerSnapshot = {
+  position: { x: number; y: number };
+  spriteFrame: number;
+  facingLeft: boolean;
+  grounded: boolean;
+  velocity: { x: number; y: number };
+};
 
-// Hitbox: bündig zum Körper (ohne Rucksack und Randbereich)
-// Gemessen am generierten Sprite: Körper bei x≈22–38, y≈13–61
-const HIT_OFFSET_X = 20; // px vom Sprite-Linksrand bis Hitbox-Linksrand
-const HIT_OFFSET_Y = 12; // px vom Sprite-Obenrand bis Kopf
-const HIT_W        = 18; // Körperbreite
-const HIT_H        = 49; // Körperhöhe (bis Fußsohle bei y=61)
+const SIZE = 64;
 
-const GRAVITY      = 1500; // px/s^2
-const MOVE_SPEED   = 300;  // px/s
-const JUMP_VELOCITY = -650; // px/s
-const RUN_FPS  = 12; // Frames pro Sekunde der Lauf-Animation
-const IDLE_FPS =  8; // Frames pro Sekunde der Idle-Animation
+const HIT_OFFSET_X = 20;
+const HIT_OFFSET_Y = 12;
+const HIT_W = 18;
+const HIT_H = 49;
 
-// Alle 8 Run-Frames vorgeladen
+const GRAVITY = 1500;
+const MOVE_SPEED = 300;
+const JUMP_VELOCITY = -650;
+const RUN_FPS = 12;
+const IDLE_FPS = 8;
+
 const RUN_FRAMES = [
   require('../assets/sprites/Kev_run_1.png'),
   require('../assets/sprites/Kev_run_2.png'),
@@ -55,7 +61,6 @@ const RUN_FRAMES = [
   require('../assets/sprites/Kev_run_8.png'),
 ];
 
-// 6 Idle-Frames (Atemanimation + Blinzeln)
 const IDLE_FRAMES = [
   require('../assets/sprites/Kev_idle_1.png'),
   require('../assets/sprites/Kev_idle_2.png'),
@@ -65,47 +70,49 @@ const IDLE_FRAMES = [
   require('../assets/sprites/Kev_idle_6.png'),
 ];
 
-// Für Sprung nehmen wir vorerst Frame 3 (Beine auseinander)
 const JUMP_FRAME = require('../assets/sprites/Kev_run_3.png');
 
 export default function Player({
-  startX = 100, groundY = 500, containerWidth = 800,
+  startX = 100,
+  groundY = 500,
+  containerWidth = 800,
   platforms = [],
   collectibles = [],
   onCollectItem,
   onTakeDamage,
   onPositionChange,
   onJump,
+  onSnapshot,
 }: Props) {
-  // pos = Sprite-Top-Left; Hitbox = pos + HIT_OFFSET_*
   const initY = groundY - HIT_OFFSET_Y - HIT_H;
-  const [pos, setPos] = useState({x: startX, y: initY});
+  const [pos, setPos] = useState({ x: startX, y: initY });
   const [spriteFrame, setSpriteFrame] = useState<number>(100);
   const [facingLeft, setFacingLeft] = useState(false);
-  const posRef = useRef({x: startX, y: initY});
-  const vel = useRef({x: 0, y: 0});
+  const posRef = useRef({ x: startX, y: initY });
+  const vel = useRef({ x: 0, y: 0 });
   const onGroundRef = useRef(true);
   const platformsRef = useRef(platforms);
   const collectiblesRef = useRef(collectibles);
   const onCollectItemRef = useRef(onCollectItem);
-  const onTakeDamageRef  = useRef(onTakeDamage);
+  const onTakeDamageRef = useRef(onTakeDamage);
   const onPositionChangeRef = useRef(onPositionChange);
   const onJumpRef = useRef(onJump);
-  const frameTimeRef = useRef(0); // akkumulierte Zeit für Frame-Wechsel
-  const frameIdxRef  = useRef(0); // aktueller Run-Frame-Index
-  const idleTimeRef  = useRef(0); // akkumulierte Zeit für Idle-Frame-Wechsel
-  const idleIdxRef   = useRef(0); // aktueller Idle-Frame-Index
-  const keys = useRef<{[k: string]: boolean}>({});
+  const onSnapshotRef = useRef(onSnapshot);
+  const frameTimeRef = useRef(0);
+  const frameIdxRef = useRef(0);
+  const idleTimeRef = useRef(0);
+  const idleIdxRef = useRef(0);
+  const keys = useRef<{ [k: string]: boolean }>({});
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number | null>(null);
 
-  // keep refs in sync without restarting the RAF loop
   useEffect(() => { platformsRef.current = platforms; }, [platforms]);
   useEffect(() => { collectiblesRef.current = collectibles; }, [collectibles]);
   useEffect(() => { onCollectItemRef.current = onCollectItem; }, [onCollectItem]);
   useEffect(() => { onTakeDamageRef.current = onTakeDamage; }, [onTakeDamage]);
   useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
   useEffect(() => { onJumpRef.current = onJump; }, [onJump]);
+  useEffect(() => { onSnapshotRef.current = onSnapshot; }, [onSnapshot]);
 
   useEffect(() => {
     function down(e: KeyboardEvent) {
@@ -123,13 +130,11 @@ export default function Player({
   }, []);
 
   useEffect(() => {
-    // Single RAF loop; do not re-create on every position change.
     const step = (t: number) => {
       if (lastRef.current == null) lastRef.current = t;
-      const dt = (t - lastRef.current) / 1000; // seconds
+      const dt = (t - lastRef.current) / 1000;
       lastRef.current = t;
 
-      // input
       const left = keys.current['ArrowLeft'] || keys.current['KeyA'] || keys.current['TouchLeft'];
       const right = keys.current['ArrowRight'] || keys.current['KeyD'] || keys.current['TouchRight'];
       const jump = keys.current['Space'];
@@ -138,34 +143,29 @@ export default function Player({
       if (left) vel.current.x = -MOVE_SPEED;
       if (right) vel.current.x = MOVE_SPEED;
 
-      // jump (only from ground or platform)
       if (jump && onGroundRef.current) {
         vel.current.y = JUMP_VELOCITY;
         onGroundRef.current = false;
         onJumpRef.current?.();
       }
 
-      // physics
       vel.current.y += GRAVITY * dt;
-      // X: Sprite bleibt so, dass Hitbox im Spielfeld bleibt
       const nextX = Math.max(
         -HIT_OFFSET_X,
-        Math.min(containerWidth - HIT_OFFSET_X - HIT_W, posRef.current.x + vel.current.x * dt)
+        Math.min(containerWidth - HIT_OFFSET_X - HIT_W, posRef.current.x + vel.current.x * dt),
       );
       let nextY = posRef.current.y + vel.current.y * dt;
 
       let landed = false;
 
-      // platform collision
       for (const p of platformsRef.current) {
-        const hbX     = nextX + HIT_OFFSET_X;
+        const hbX = nextX + HIT_OFFSET_X;
         const overlapX = hbX + HIT_W > p.x && hbX < p.x + p.width;
 
-        // top collision
-        const feetY   = nextY + HIT_OFFSET_Y + HIT_H;
+        const feetY = nextY + HIT_OFFSET_Y + HIT_H;
         const prevFeetY = posRef.current.y + HIT_OFFSET_Y + HIT_H;
         const feetReach = feetY >= p.y;
-        const wasAbove  = prevFeetY <= p.y + 6;
+        const wasAbove = prevFeetY <= p.y + 6;
         if (overlapX && feetReach && wasAbove && vel.current.y >= 0) {
           nextY = p.y - HIT_OFFSET_Y - HIT_H;
           vel.current.y = 0;
@@ -173,11 +173,10 @@ export default function Player({
           break;
         }
 
-        // bottom collision (solid platforms only)
         if (p.solid) {
-          const headY        = nextY + HIT_OFFSET_Y;
-          const prevHeadY    = posRef.current.y + HIT_OFFSET_Y;
-          const headHitsBottom   = headY <= p.y + p.height;
+          const headY = nextY + HIT_OFFSET_Y;
+          const prevHeadY = posRef.current.y + HIT_OFFSET_Y;
+          const headHitsBottom = headY <= p.y + p.height;
           const wasBelowPlatform = prevHeadY >= p.y + p.height - 6;
           if (overlapX && headHitsBottom && wasBelowPlatform && vel.current.y < 0) {
             nextY = p.y + p.height - HIT_OFFSET_Y;
@@ -186,7 +185,6 @@ export default function Player({
         }
       }
 
-      // ground collision
       if (nextY + HIT_OFFSET_Y + HIT_H >= groundY) {
         nextY = groundY - HIT_OFFSET_Y - HIT_H;
         vel.current.y = 0;
@@ -195,11 +193,10 @@ export default function Player({
 
       onGroundRef.current = landed;
 
-      // Animations-State bestimmen
       const isMoving = vel.current.x !== 0;
       let newFrame: number;
       if (!landed) {
-        newFrame = -2; // Sprung
+        newFrame = -2;
       } else if (isMoving) {
         frameTimeRef.current += dt;
         if (frameTimeRef.current >= 1 / RUN_FPS) {
@@ -209,22 +206,19 @@ export default function Player({
         idleTimeRef.current = 0;
         newFrame = frameIdxRef.current;
       } else {
-        // Idle-Animation
         frameTimeRef.current = 0;
-        frameIdxRef.current  = 0;
+        frameIdxRef.current = 0;
         idleTimeRef.current += dt;
         if (idleTimeRef.current >= 1 / IDLE_FPS) {
           idleTimeRef.current = 0;
           idleIdxRef.current = (idleIdxRef.current + 1) % 6;
         }
-        newFrame = 100 + idleIdxRef.current; // 100–105 = Idle-Frames
+        newFrame = 100 + idleIdxRef.current;
       }
 
-      // Collectible-Kollision prüfen
       const hbX2 = nextX + HIT_OFFSET_X;
       const hbY2 = nextY + HIT_OFFSET_Y;
       for (const c of collectiblesRef.current) {
-        // Einfache AABB-Kolision: Spieler-Hitbox gegen Collectible-Box
         const overlapCX = hbX2 + HIT_W > c.x && hbX2 < c.x + c.size;
         const overlapCY = hbY2 + HIT_H > c.y - c.size && hbY2 < c.y;
         if (overlapCX && overlapCY) {
@@ -232,14 +226,20 @@ export default function Player({
         }
       }
 
-      // update refs and state
-      const newPos = {x: nextX, y: nextY};
+      const newPos = { x: nextX, y: nextY };
       posRef.current = newPos;
       setPos(newPos);
       setSpriteFrame(newFrame);
       onPositionChangeRef.current?.(newPos);
       if (left) setFacingLeft(true);
       if (right) setFacingLeft(false);
+      onSnapshotRef.current?.({
+        position: newPos,
+        spriteFrame: newFrame,
+        facingLeft: left ? true : right ? false : facingLeft,
+        grounded: landed,
+        velocity: { x: vel.current.x, y: vel.current.y },
+      });
       rafRef.current = requestAnimationFrame(step);
     };
 
@@ -249,10 +249,8 @@ export default function Player({
       rafRef.current = null;
       lastRef.current = null;
     };
-    // groundY and containerWidth affect physics bounds; re-run if they change.
-  }, [groundY, containerWidth]);
+  }, [containerWidth, groundY, facingLeft]);
 
-  // simple on-screen controls for touch
   const pressLeft = () => (keys.current['TouchLeft'] = true);
   const releaseLeft = () => (keys.current['TouchLeft'] = false);
   const pressRight = () => (keys.current['TouchRight'] = true);
@@ -261,8 +259,8 @@ export default function Player({
   const releaseJump = () => (keys.current['Space'] = false);
 
   const currentSource =
-    spriteFrame === -2          ? JUMP_FRAME :
-    spriteFrame >= 100          ? IDLE_FRAMES[spriteFrame - 100] :
+    spriteFrame === -2 ? JUMP_FRAME :
+    spriteFrame >= 100 ? IDLE_FRAMES[spriteFrame - 100] :
     RUN_FRAMES[spriteFrame] ?? IDLE_FRAMES[0];
 
   return (
@@ -271,36 +269,20 @@ export default function Player({
         source={currentSource}
         style={[
           styles.player,
-          {left: pos.x, top: pos.y},
+          { left: pos.x, top: pos.y },
           facingLeft && styles.flipped,
         ]}
         resizeMode="contain"
       />
 
-      {/* touch controls (visible on mobile / web) */}
       <View style={styles.controls} pointerEvents="box-none">
-        <Pressable
-          onPressIn={pressLeft}
-          onPressOut={releaseLeft}
-          style={styles.controlButton}
-          accessibilityLabel="Left"
-        >
+        <Pressable onPressIn={pressLeft} onPressOut={releaseLeft} style={styles.controlButton} accessibilityLabel="Left">
           <Text style={styles.controlText}>◀</Text>
         </Pressable>
-        <Pressable
-          onPressIn={pressRight}
-          onPressOut={releaseRight}
-          style={styles.controlButton}
-          accessibilityLabel="Right"
-        >
+        <Pressable onPressIn={pressRight} onPressOut={releaseRight} style={styles.controlButton} accessibilityLabel="Right">
           <Text style={styles.controlText}>▶</Text>
         </Pressable>
-        <Pressable
-          onPressIn={pressJump}
-          onPressOut={releaseJump}
-          style={[styles.controlButton, styles.jumpButton]}
-          accessibilityLabel="Jump"
-        >
+        <Pressable onPressIn={pressJump} onPressOut={releaseJump} style={[styles.controlButton, styles.jumpButton]} accessibilityLabel="Jump">
           <Text style={styles.controlText}>↑</Text>
         </Pressable>
       </View>
@@ -327,7 +309,7 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   flipped: {
-    transform: [{scaleX: -1}],
+    transform: [{ scaleX: -1 }],
   },
   controls: {
     position: 'absolute',
@@ -347,11 +329,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   jumpButton: {
-    backgroundColor: 'rgba(0,0,0,0.45)'
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   controlText: {
     color: 'white',
     fontSize: 20,
-    fontWeight: '700'
-  }
+    fontWeight: '700',
+  },
 });
